@@ -31,7 +31,7 @@
 struct Point:
     bias: int128   # ts时刻对应的voting power（线性衰减）
     slope: int128  # - dweight / dt ，是一个负值，表示该epoch内voting power的衰减速率
-    ts: uint256   # 该epoch内的某个时间戳
+    ts: uint256   # 对于个人用户，即为锁仓变化时的block.timestamp;;;对于全局的point_history中，当前时间戳所在的epoch之前时，ts都是 WEEK*n，即epoch的起止时间戳点；当前时间戳所在的epoch时，ts会暂时被保存为block.timestamp!!
     blk: uint256  # ts时刻对应的区块号
 # We cannot really do block numbers per se b/c slope is per time, not per block
 # and per block could be fairly bad b/c Ethereum changes blocktimes.
@@ -298,7 +298,7 @@ def _checkpoint(addr: address, old_locked: LockedBalance, new_locked: LockedBala
     for i in range(255):
         # Hopefully it won't happen that this won't get used in 5 years!
         # If it does, users will be able to withdraw but vote weight will be broken
-        t_i += WEEK  #下一epoch的起始时间戳
+        t_i += WEEK  # 该epoch的截止时间戳+1（即下一epoch的起始时间戳）
         d_slope: int128 = 0
         if t_i > block.timestamp:
             t_i = block.timestamp  # 当前时间戳所在的epoch，下方会break跳出for循环
