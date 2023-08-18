@@ -90,11 +90,11 @@ supply: public(uint256)
 
 locked: public(HashMap[address, LockedBalance])
 
-epoch: public(uint256)
-point_history: public(Point[100000000000000000000000000000])  # epoch -> unsigned point
-user_point_history: public(HashMap[address, Point[1000000000]])  # user -> Point[user_epoch]
-user_point_epoch: public(HashMap[address, uint256])
-slope_changes: public(HashMap[uint256, int128])  # time -> signed slope change
+epoch: public(uint256) # 最新的全局epoch，指向point_history中的最新元素位置。1个epoch=1 WEEK
+point_history: public(Point[100000000000000000000000000000])  # epoch => unsigned point
+user_point_history: public(HashMap[address, Point[1000000000]])  # user => Point[user_epoch] 。user_epoch和全局epoch之间无关，每次用户更新锁仓信息时，user_epoch就会加1
+user_point_epoch: public(HashMap[address, uint256]) # user => 最新的user_epoch编号
+slope_changes: public(HashMap[uint256, int128])  # WEEK*n类型的timestamp => 有符号的全局slope change：表示在该时间戳时，总投票权的斜率如何发生变化（任一用户的锁仓时间、锁仓量发生改变时，该变量中的某些值都会更新）
 
 # Aragon's view methods for compatibility
 controller: public(address)
