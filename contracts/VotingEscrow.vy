@@ -23,10 +23,10 @@
 #       maxtime (4 years?)
 
 struct Point:
-    bias: int128
-    slope: int128  # - dweight / dt
-    ts: uint256
-    blk: uint256  # block
+    bias: int128   # ts时刻对应的voting power（线性衰减）
+    slope: int128  # - dweight / dt ，是一个负值，表示该epoch内voting power的衰减速率
+    ts: uint256   # 该epoch内的某个时间戳
+    blk: uint256  # ts时刻对应的区块号
 # We cannot really do block numbers per se b/c slope is per time, not per block
 # and per block could be fairly bad b/c Ethereum changes blocktimes.
 # What we can do is to extrapolate ***At functions
@@ -237,6 +237,13 @@ def _checkpoint(addr: address, old_locked: LockedBalance, new_locked: LockedBala
     @param addr User's wallet address. No user checkpoint if 0x0
     @param old_locked Pevious locked amount / end lock time for the user
     @param new_locked New locked amount / end lock time for the user
+全局维度：
+1. 根据slope_changes 更新补全 [epoch, 当前时间戳]  间的全局 point_history信息
+2. 根据old_locked和new_locked在锁仓时间、锁仓量上的变化，更新slope_chages对应时间戳上的斜率变化
+
+用户维度：
+1. 更新用户的user_point_epoch(加一)
+2. 在user_point_history中追加user_epoch+1对应的Point信息
     """
     u_old: Point = empty(Point)
     u_new: Point = empty(Point)
@@ -279,14 +286,16 @@ def _checkpoint(addr: address, old_locked: LockedBalance, new_locked: LockedBala
     # But that's ok b/c we know the block in such case
 
     # Go over weeks to fill history and calculate what the current point is
-    t_i: uint256 = (last_checkpoint / WEEK) * WEEK
+    t_i: uint256 = (last_checkpoint / WEEK) * WEEK # 链上已记录的最新epoch的起始时间戳
+   
+   # 补全“当前时间戳所在epoch之前的”所有point_history信息
     for i in range(255):
         # Hopefully it won't happen that this won't get used in 5 years!
         # If it does, users will be able to withdraw but vote weight will be broken
-        t_i += WEEK
+        t_i += WEEK  #下一epoch的起始时间戳
         d_slope: int128 = 0
         if t_i > block.timestamp:
-            t_i = block.timestamp
+            t_i = block.timestamp  # 当前时间戳所在的epoch，下方会break跳出for循环
         else:
             d_slope = self.slope_changes[t_i]
         last_point.bias -= last_point.slope * convert(t_i - last_checkpoint, int128)
@@ -308,6 +317,7 @@ def _checkpoint(addr: address, old_locked: LockedBalance, new_locked: LockedBala
     self.epoch = _epoch
     # Now point_history is filled until t=now
 
+# 单独更新 当前时间戳所在的epoch信息：因为此时刻存在了锁仓的变动
     if addr != ZERO_ADDRESS:
         # If last point was in this block, the slope change has been applied already
         # But in such case we have 0 slope(s)
@@ -321,6 +331,7 @@ def _checkpoint(addr: address, old_locked: LockedBalance, new_locked: LockedBala
     # Record the changed point into history
     self.point_history[_epoch] = last_point
 
+# 更新补全 全局的slope_changes
     if addr != ZERO_ADDRESS:
         # Schedule the slope changes (slope is going down)
         # We subtract new_user_slope from [new_locked.end]
@@ -338,6 +349,7 @@ def _checkpoint(addr: address, old_locked: LockedBalance, new_locked: LockedBala
                 self.slope_changes[new_locked.end] = new_dslope
             # else: we recorded it already in old_dslope
 
+# 追加用户维度的point信息
         # Now handle user history
         user_epoch: uint256 = self.user_point_epoch[addr] + 1
 
