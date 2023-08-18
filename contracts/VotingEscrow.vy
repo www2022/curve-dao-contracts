@@ -7,6 +7,12 @@
         committed to the future of (whatever they are voting for)
 @dev Vote weight decays linearly over time. Lock time cannot be
      more than `MAXTIME` (4 years).
+用户投票权自锁定时刻起呈线性递减趋势。总投票权W也是如此。
+为了避免周期性反复读取数据，每次用户存入、取款或更改锁定时间时，我们在user_point_History中，将用户锁仓的斜率和截距记录在Point对象中----》每一次更改都将user epoch加1
+我们还改变了总投票权$W(T)$的斜率和截距，并记录在point_History中--》全局的每个epoch周期为1 WEEK
+此外，当用户的锁仓将要结束时，我们在slope_changes中预先设定$W(T)$的斜率的改变
+
+当用户deposit、increase以及锁仓到期时，全局｜个人的 斜率和截距都会发生变化
 """
 
 # Voting escrow to have time-weighted votes
